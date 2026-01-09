@@ -7,7 +7,7 @@ Requires the litellm extra: `pip install stirrup[litellm]`
 """
 
 import logging
-from typing import Any
+from typing import Any, Literal
 
 try:
     from litellm import acompletion
@@ -38,6 +38,8 @@ __all__ = [
 
 LOGGER = logging.getLogger(__name__)
 
+type ReasoningEffort = Literal["none", "minimal", "low", "medium", "high", "xhigh", "default"]
+
 
 class LiteLLMClient(LLMClient):
     """LiteLLM-based client supporting multiple LLM providers with unified interface.
@@ -49,8 +51,8 @@ class LiteLLMClient(LLMClient):
         self,
         model_slug: str,
         max_tokens: int,
-        supports_audio_input: bool = False,
-        reasoning_effort: str | None = None,
+        api_key: str | None = None,
+        reasoning_effort: ReasoningEffort | None = None,
         kwargs: dict[str, Any] | None = None,
     ) -> None:
         """Initialize LiteLLM client with model configuration and capabilities.
@@ -58,15 +60,13 @@ class LiteLLMClient(LLMClient):
         Args:
             model_slug: Model identifier for LiteLLM (e.g., 'anthropic/claude-3-5-sonnet-20241022')
             max_tokens: Maximum context window size in tokens
-            supports_audio_input: Whether the model supports audio inputs
             reasoning_effort: Reasoning effort level for extended thinking models (e.g., 'medium', 'high')
             kwargs: Additional arguments to pass to LiteLLM completion calls
         """
         self._model_slug = model_slug
-        self._supports_video_input = False
-        self._supports_audio_input = supports_audio_input
         self._max_tokens = max_tokens
-        self._reasoning_effort = reasoning_effort
+        self._reasoning_effort: ReasoningEffort | None = reasoning_effort
+        self._api_key = api_key
         self._kwargs = kwargs or {}
 
     @property
@@ -92,6 +92,8 @@ class LiteLLMClient(LLMClient):
             tools=to_openai_tools(tools) if tools else None,
             tool_choice="auto" if tools else None,
             max_tokens=self._max_tokens,
+            reasoning_effort=self._reasoning_effort,
+            api_key=self._api_key,
             **self._kwargs,
         )
 
@@ -103,14 +105,20 @@ class LiteLLMClient(LLMClient):
             )
 
         msg = choice["message"]
-
         reasoning: Reasoning | None = None
         if getattr(msg, "reasoning_content", None) is not None:
             reasoning = Reasoning(content=msg.reasoning_content)
         if getattr(msg, "thinking_blocks", None) is not None and len(msg.thinking_blocks) > 0:
-            reasoning = Reasoning(
-                signature=msg.thinking_blocks[0]["signature"], content=msg.thinking_blocks[0]["content"]
-            )
+            if len(msg.thinking_blocks) > 1:
+                raise ValueError("Found multiple thinking blocks in the response")
+
+            signature = msg.thinking_blocks[0].get("thinking_signature", None)
+            content = msg.thinking_blocks[0].get("thinking", None)
+
+            if signature is None and content is None:
+                raise ValueError("Signature and content not found in the thinking block response")
+
+            reasoning = Reasoning(signature=signature, content=content)
 
         usage = r["usage"]
 
@@ -119,6 +127,7 @@ class LiteLLMClient(LLMClient):
                 tool_call_id=tc.get("id"),
                 name=tc["function"]["name"],
                 arguments=tc["function"].get("arguments", "") or "",
+                signature=tc.get("provider_specific_fields", {}).get("thought_signature", None),
             )
             for tc in (msg.get("tool_calls") or [])
         ]

@@ -19,5 +19,5 @@ SIMPLE_FINISH_TOOL: Tool[FinishParams, ToolUseCountMetadata] = Tool[FinishParams
     name=FINISH_TOOL_NAME,
     description="Signal task completion with a reason. Use when the task is finished or cannot proceed further. Note that you will need a separate turn to finish.",
     parameters=FinishParams,
-    executor=lambda params: ToolResult(content=params.reason, metadata=ToolUseCountMetadata()),
+    executor=lambda params: ToolResult(content=params.reason, metadata=ToolUseCountMetadata(), success=True),
 )

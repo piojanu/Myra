@@ -16,6 +16,7 @@ import asyncio
 import os
 from pathlib import Path
 
+from dotenv import load_dotenv
 from stirrup import Agent
 from stirrup.clients.chat_completions_client import ChatCompletionsClient
 
@@ -176,11 +177,15 @@ async def run_single_iteration(mock_mode: bool = MOCK_MODE) -> dict:
 
 async def main() -> None:
     """Run a single iteration of the ExistencePhilosopher."""
-    print(f"Mock mode: {MOCK_MODE}")
+    load_dotenv()
+
+    mock_mode = os.getenv("MOCK_MODE", str(MOCK_MODE)).lower() in ("true", "1", "yes")
+
+    print(f"Mock mode: {mock_mode}")
     print(f"Workspace: {WORKSPACE_DIR}")
     print()
 
-    await run_single_iteration(mock_mode=MOCK_MODE)
+    await run_single_iteration(mock_mode=mock_mode)
 
 
 if __name__ == "__main__":

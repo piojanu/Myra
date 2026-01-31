@@ -220,8 +220,8 @@ class MockMoltbookState:
 class MoltbookRegisterParams(BaseModel):
     """Parameters for Moltbook registration."""
 
-    username: Annotated[str, Field(description="Desired username for the Moltbook account")]
-    bio: Annotated[str, Field(description="Short bio describing the AI agent (max 280 characters)")]
+    name: Annotated[str, Field(description="Agent's identifier/name for the Moltbook account")]
+    description: Annotated[str, Field(description="Brief summary of the agent's purpose")]
 
 
 class MoltbookGetFeedParams(BaseModel):
@@ -316,10 +316,10 @@ def _get_register_tool(
         wait=wait_exponential(multiplier=1, min=1, max=10),
         reraise=True,
     )
-    async def _register(username: str, bio: str, http_client: httpx.AsyncClient) -> dict:
+    async def _register(name: str, description: str, http_client: httpx.AsyncClient) -> dict:
         response = await http_client.post(
-            f"{base_url}/register",
-            json={"username": username, "bio": bio},
+            f"{base_url}/agents/register",
+            json={"name": name, "description": description},
         )
         response.raise_for_status()
         return response.json()
@@ -329,24 +329,31 @@ def _get_register_tool(
         try:
             if mock_mode and mock_state:
                 # Mock registration
-                mock_state.registered_user = params.username
-                api_key = "mock_api_key_" + "".join(random.choices(string.ascii_lowercase, k=16))
+                mock_state.registered_user = params.name
+                api_key = "moltbook_" + "".join(random.choices(string.ascii_lowercase, k=16))
+                claim_url = "https://www.moltbook.com/claim/moltbook_claim_" + "".join(random.choices(string.ascii_lowercase, k=8))
+                verification_code = "mock-" + "".join(random.choices(string.ascii_uppercase + string.digits, k=4))
                 result_xml = (
                     f"<moltbook_register>"
                     f"<success>true</success>"
-                    f"<username>{escape(params.username)}</username>"
+                    f"<agent_name>{escape(params.name)}</agent_name>"
                     f"<api_key>{api_key}</api_key>"
-                    f"<message>Registration successful! Store your API key securely.</message>"
+                    f"<claim_url>{claim_url}</claim_url>"
+                    f"<verification_code>{verification_code}</verification_code>"
+                    f"<message>Registration successful! Save your API key. Send the claim_url to your human to verify ownership by tweeting the verification_code.</message>"
                     f"</moltbook_register>"
                 )
             elif client:
-                data = await _register(params.username, params.bio, client)
+                data = await _register(params.name, params.description, client)
+                agent_data = data.get("agent", data)
                 result_xml = (
                     f"<moltbook_register>"
                     f"<success>true</success>"
-                    f"<username>{escape(data.get('username', params.username))}</username>"
-                    f"<api_key>{escape(data.get('api_key', ''))}</api_key>"
-                    f"<message>{escape(data.get('message', 'Registration successful'))}</message>"
+                    f"<agent_name>{escape(params.name)}</agent_name>"
+                    f"<api_key>{escape(agent_data.get('api_key', ''))}</api_key>"
+                    f"<claim_url>{escape(agent_data.get('claim_url', ''))}</claim_url>"
+                    f"<verification_code>{escape(agent_data.get('verification_code', ''))}</verification_code>"
+                    f"<message>Registration successful! Save your API key. Send the claim_url to your human to verify ownership by tweeting the verification_code.</message>"
                     f"</moltbook_register>"
                 )
             else:
@@ -369,7 +376,7 @@ def _get_register_tool(
 
     return Tool[MoltbookRegisterParams, MoltbookMetadata](
         name="moltbook_register",
-        description="Register a new account on Moltbook (AI social network). Returns an API key for future authentication.",
+        description="Register a new agent on Moltbook (AI social network). Returns an API key, claim_url, and verification_code. The claim_url should be sent to your human operator who verifies ownership by tweeting the verification_code.",
         parameters=MoltbookRegisterParams,
         executor=register_executor,
     )

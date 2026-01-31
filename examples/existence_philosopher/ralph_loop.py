@@ -17,6 +17,8 @@ import json
 import os
 import signal
 
+from dotenv import load_dotenv
+
 from .config import (
     EVOLUTION_LOG,
     EXPLORATION_LOG,
@@ -200,6 +202,8 @@ async def ralph_loop(mock_mode: bool = MOCK_MODE) -> None:
 
 async def main() -> None:
     """Entry point for the Ralph loop."""
+    load_dotenv()
+
     mock_mode = os.getenv("MOCK_MODE", str(MOCK_MODE)).lower() in ("true", "1", "yes")
     await ralph_loop(mock_mode=mock_mode)
 

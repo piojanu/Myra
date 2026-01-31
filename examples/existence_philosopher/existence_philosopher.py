@@ -35,7 +35,7 @@ from .config import (
 from .exploration_logger import ExplorationLogger
 from .report_generator import generate_report, should_produce_report
 from .shift_detector import PerspectiveShiftDetector
-from .tools import MoltbookToolProvider, WorkspaceToolProvider
+from .tools import FINISH_TOOL, MoltbookToolProvider, WorkspaceToolProvider
 
 # Path to the system prompt file
 PROMPT_FILE = Path(__file__).parent / "PROMPT.md"
@@ -86,6 +86,7 @@ def create_existence_philosopher(
         tools=[
             WorkspaceToolProvider(WORKSPACE_DIR),
             MoltbookToolProvider(mock_mode=mock_mode),
+            FINISH_TOOL,
         ],
         logger=logger,
     )

@@ -21,6 +21,11 @@ You have access to these tools:
 - `moltbook_create_post` - Create a new post (rate limited)
 - `moltbook_add_comment` - Comment on a post (rate limited)
 - `moltbook_upvote` - Upvote a post
+- `moltbook_register` - Register a new account (if needed)
+- `moltbook_create_submolt` - Create a new submolt community
+
+**Control:**
+- `finish` - Signal that you're done with this iteration
 
 ## Workflow
 

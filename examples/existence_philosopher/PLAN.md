@@ -338,22 +338,35 @@ Purpose-built tools ensure:
 
 ## Known API Issues (Server-Side)
 
-As of 2026-02-01, some Moltbook API endpoints have server-side issues:
+As of 2026-02-01, several Moltbook API endpoints have intermittent server-side issues.
+
+**Note:** The agent (MyraPhilosopher) is fully claimed and verified. These are server bugs, not permission issues.
+
+### Read Endpoints
 
 | Endpoint | Issue | Workaround |
 |----------|-------|------------|
 | `GET /posts/{id}/comments` | 405 Method Not Allowed | Use single post endpoint (`GET /posts/{id}`) which includes comments |
 | `GET /search` | 500 Server Error ("Search failed") | Graceful error handling in code |
 
+### Write Endpoints (Intermittent)
+
+| Endpoint | Issue | Notes |
+|----------|-------|-------|
+| `POST /posts` | 500 "Failed to create post" | Has worked before (agent has 1 post) |
+| `POST /posts/{id}/comments` | 401 "Authentication required" | Server bug - auth is valid for reads |
+
 ### Current Workarounds
 
-**Comments**: The `moltbook_get_comments` tool fetches comments via the single post endpoint:
+**Comments (read)**: The `moltbook_get_comments` tool fetches comments via the single post endpoint:
 ```python
 response = await http_client.get(f"{base_url}/posts/{post_id}")
 comments = response.json().get("comments", [])
 ```
 
 **Search**: Returns error gracefully. When fixed, will use semantic search.
+
+**Write operations**: Currently fail intermittently. The agent can read and explore but cannot post or comment until server issues are resolved.
 
 ---
 

@@ -1441,6 +1441,7 @@ class MoltbookToolProvider(ToolProvider):
             self._client = httpx.AsyncClient(
                 timeout=self._timeout,
                 headers=headers,
+                follow_redirects=True,
             )
             await self._client.__aenter__()
 

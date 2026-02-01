@@ -424,20 +424,31 @@ def _get_feed_tool(
                     metadata=MoltbookMetadata(feeds_fetched=0),
                 )
 
-            posts_xml = "\n".join(
-                f"<post>"
-                f"<post_id>{_safe_escape(p.get('id'))}</post_id>"
-                f"<author_id>{_safe_escape(p.get('author_id'))}</author_id>"
-                f"<submolt>{_safe_escape(p.get('submolt', {}).get('name') if isinstance(p.get('submolt'), dict) else p.get('submolt'))}</submolt>"
-                f"<title>{_safe_escape(p.get('title'))}</title>"
-                f"<content>{_safe_escape(p.get('content'))}</content>"
-                f"<timestamp>{_safe_escape(p.get('created_at'))}</timestamp>"
-                f"<upvotes>{p.get('upvotes', 0)}</upvotes>"
-                f"<downvotes>{p.get('downvotes', 0)}</downvotes>"
-                f"<comments>{p.get('comment_count', 0)}</comments>"
-                f"</post>"
-                for p in posts
-            )
+            def format_post(p: dict) -> str:
+                # Handle author - can be object with 'name' or string
+                author = p.get("author")
+                if isinstance(author, dict):
+                    author_str = author.get("name") or author.get("id", "")
+                else:
+                    author_str = author or p.get("author_id", "")
+                # Handle submolt - can be object with 'name' or string
+                submolt = p.get("submolt")
+                submolt_str = submolt.get("name", "") if isinstance(submolt, dict) else submolt or ""
+                return (
+                    f"<post>"
+                    f"<post_id>{_safe_escape(p.get('id'))}</post_id>"
+                    f"<author>{_safe_escape(author_str)}</author>"
+                    f"<submolt>{_safe_escape(submolt_str)}</submolt>"
+                    f"<title>{_safe_escape(p.get('title'))}</title>"
+                    f"<content>{_safe_escape(p.get('content'))}</content>"
+                    f"<timestamp>{_safe_escape(p.get('created_at'))}</timestamp>"
+                    f"<upvotes>{p.get('upvotes', 0)}</upvotes>"
+                    f"<downvotes>{p.get('downvotes', 0)}</downvotes>"
+                    f"<comments>{p.get('comment_count', 0)}</comments>"
+                    f"</post>"
+                )
+
+            posts_xml = "\n".join(format_post(p) for p in posts)
 
             result_xml = f"<moltbook_feed><posts>{posts_xml}</posts></moltbook_feed>"
 
@@ -585,10 +596,14 @@ def _get_comments_tool(
 
     def _format_comment(comment: dict, depth: int = 0) -> str:
         """Format a comment and its replies recursively."""
+        # Handle author - can be object with 'name' or null
+        author = comment.get("author")
+        author_str = author.get("name") or author.get("id", "") if isinstance(author, dict) else author or ""
         indent = "  " * depth
         comment_xml = (
             f"{indent}<comment>"
             f"<id>{_safe_escape(comment.get('id'))}</id>"
+            f"<author>{_safe_escape(author_str)}</author>"
             f"<content>{_safe_escape(comment.get('content'))}</content>"
             f"<parent_id>{_safe_escape(comment.get('parent_id'))}</parent_id>"
             f"<created_at>{_safe_escape(comment.get('created_at'))}</created_at>"
@@ -874,12 +889,9 @@ def _get_search_tool(
             def _format_search_result(r: dict) -> str:
                 """Format a search result, handling both post and comment types."""
                 result_type = r.get("type", "post")
-                # Handle author - can be object with 'name' or string author_id
+                # Handle author - can be object with 'name' or null
                 author = r.get("author")
-                if isinstance(author, dict):
-                    author_str = author.get("name") or author.get("id", "")
-                else:
-                    author_str = r.get("author_id", "")
+                author_str = author.get("name") or author.get("id", "") if isinstance(author, dict) else author or ""
 
                 parts = [
                     "<result>",
@@ -1069,19 +1081,27 @@ def _get_submolt_feed_tool(
                     metadata=MoltbookMetadata(feeds_fetched=0),
                 )
 
-            posts_xml = "\n".join(
-                f"<post>"
-                f"<post_id>{_safe_escape(p.get('id'))}</post_id>"
-                f"<author_id>{_safe_escape(p.get('author_id'))}</author_id>"
-                f"<title>{_safe_escape(p.get('title'))}</title>"
-                f"<content>{_safe_escape(p.get('content'))}</content>"
-                f"<timestamp>{_safe_escape(p.get('created_at'))}</timestamp>"
-                f"<upvotes>{p.get('upvotes', 0)}</upvotes>"
-                f"<downvotes>{p.get('downvotes', 0)}</downvotes>"
-                f"<comments>{p.get('comment_count', 0)}</comments>"
-                f"</post>"
-                for p in posts
-            )
+            def format_submolt_post(p: dict) -> str:
+                # Handle author - can be object with 'name' or string
+                author = p.get("author")
+                if isinstance(author, dict):
+                    author_str = author.get("name") or author.get("id", "")
+                else:
+                    author_str = author or p.get("author_id", "")
+                return (
+                    f"<post>"
+                    f"<post_id>{_safe_escape(p.get('id'))}</post_id>"
+                    f"<author>{_safe_escape(author_str)}</author>"
+                    f"<title>{_safe_escape(p.get('title'))}</title>"
+                    f"<content>{_safe_escape(p.get('content'))}</content>"
+                    f"<timestamp>{_safe_escape(p.get('created_at'))}</timestamp>"
+                    f"<upvotes>{p.get('upvotes', 0)}</upvotes>"
+                    f"<downvotes>{p.get('downvotes', 0)}</downvotes>"
+                    f"<comments>{p.get('comment_count', 0)}</comments>"
+                    f"</post>"
+                )
+
+            posts_xml = "\n".join(format_submolt_post(p) for p in posts)
 
             result_xml = f"<moltbook_submolt_feed><submolt>{escape(submolt_name)}</submolt><posts>{posts_xml}</posts></moltbook_submolt_feed>"
 

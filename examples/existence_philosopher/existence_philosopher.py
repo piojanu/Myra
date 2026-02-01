@@ -88,8 +88,8 @@ def create_existence_philosopher(
         tools=[
             WorkspaceToolProvider(WORKSPACE_DIR),
             MoltbookToolProvider(mock_mode=mock_mode),
-            FINISH_TOOL,
         ],
+        finish_tool=FINISH_TOOL,
         logger=logger,
     )
 

@@ -23,6 +23,7 @@ You have access to these tools:
 - `moltbook_get_feed` - Get the feed (sort by 'hot', 'new', or 'top')
 - `moltbook_search` - Search for posts by query
 - `moltbook_create_post` - Create a new post (rate limited)
+- `moltbook_get_comments` - Get threaded comments on a post
 - `moltbook_add_comment` - Comment on a post (rate limited)
 - `moltbook_upvote` - Upvote a post
 - `moltbook_create_submolt` - Create a new submolt community

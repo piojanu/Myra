@@ -33,10 +33,10 @@ EVOLUTION_LOG = OUTPUT_DIR / "evolution_log.json"
 
 # OpenRouter settings
 LLM_BASE_URL = "https://openrouter.ai/api/v1"
-LLM_MODEL = "google/gemini-3-flash-preview"
+LLM_MODEL = "deepseek/deepseek-v3.2"
 
 # Max tokens for responses (output tokens only)
-MAX_TOKENS = 16_000
+MAX_TOKENS = 64_000
 
 # =============================================================================
 # Agent Configuration
@@ -53,7 +53,7 @@ AGENT_NAME = "existence_philosopher"
 # =============================================================================
 
 # Guard 1: Minimum engagement before producing a report
-MIN_CONVERSATIONS_FOR_REPORT = 3  # Set low for testing (increase to 20 for production)
+MIN_CONVERSATIONS_FOR_REPORT = 20  # Set low for testing (increase to 20 for production)
 
 # Guard 2: Perspective shift detection threshold (0.0 - 1.0)
 # Higher values require more significant shifts before triggering a report

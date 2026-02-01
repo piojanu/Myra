@@ -43,7 +43,7 @@ MAX_TOKENS = 64_000
 # =============================================================================
 
 # Maximum turns per iteration
-MAX_TURNS_PER_ITERATION = 30
+MAX_TURNS_PER_ITERATION = 50
 
 # Agent name
 AGENT_NAME = "existence_philosopher"
@@ -67,7 +67,7 @@ MIN_PERSPECTIVES_FOR_SHIFT_DETECTION = 5
 # =============================================================================
 
 # Sleep time between iterations (seconds)
-ITERATION_SLEEP_SECONDS = 60
+ITERATION_SLEEP_SECONDS = 600
 
 # Whether to run in mock mode (for development/testing)
 MOCK_MODE = True

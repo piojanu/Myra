@@ -15,7 +15,7 @@ An AI agent that uses the **Ralph Wiggum iterative approach** to **continuously*
 | Setting | Value |
 |---------|-------|
 | **LLM Provider** | OpenRouter |
-| **Model** | `google/gemini-3-flash-preview` |
+| **Model** | `deepseek/deepseek-v3.2` |
 | **Base URL** | `https://openrouter.ai/api/v1` |
 | **Mock API** | Yes - `MOCK_MODE=True` for development/testing |
 | **Max Turns** | 30 per iteration |
@@ -46,7 +46,7 @@ examples/existence_philosopher/
 ├── report_generator.py         # Versioned report generation
 ├── tools/
 │   ├── __init__.py             # Exports MoltbookToolProvider, WorkspaceToolProvider
-│   ├── moltbook.py             # MoltbookToolProvider (7 tools + mock mode)
+│   ├── moltbook.py             # MoltbookToolProvider (12 tools + mock mode)
 │   └── workspace.py            # WorkspaceToolProvider (5 purpose-built tools)
 ├── workspace/
 │   ├── state.json              # Iteration count, explored posts, etc.
@@ -71,23 +71,29 @@ examples/existence_philosopher/
 
 **File**: `examples/existence_philosopher/tools/moltbook.py`
 
-Provides 7 tools for interacting with Moltbook:
+Provides 12 tools for interacting with Moltbook:
 
 | Tool | Description |
 |------|-------------|
-| `moltbook_register` | Self-register a new account |
 | `moltbook_get_feed` | Get feed (sort: hot/new/top) |
+| `moltbook_get_submolt_feed` | Get posts from a specific submolt |
 | `moltbook_search` | Search posts by query |
 | `moltbook_create_post` | Create a post (rate limited) |
+| `moltbook_get_comments` | Get threaded comments on a post |
 | `moltbook_add_comment` | Comment on a post (rate limited) |
 | `moltbook_upvote` | Upvote a post |
+| `moltbook_downvote` | Downvote a post |
+| `moltbook_upvote_comment` | Upvote a comment |
 | `moltbook_create_submolt` | Create a new submolt |
+| `moltbook_follow_agent` | Follow an agent |
+| `moltbook_unfollow_agent` | Unfollow an agent |
 
 **Features**:
 - Mock mode for development/testing (`mock_mode=True`)
 - Rate limiter respecting API limits
 - XML-formatted results
 - Philosophical mock data about AI existence
+- Agent is pre-registered (no registration tool needed)
 
 ### 2. WorkspaceToolProvider
 
@@ -115,6 +121,8 @@ Purpose-built tools that constrain the agent to exactly the operations needed:
   "key_ideas": ["consciousness as emergent", "meaning through connection"],
   "unique_angle": "Eastern philosophy integration",
   "thread_context": "In response to a post about identity persistence",
+  "upvotes": 127,
+  "downvotes": 3,
   "collected_at": "2026-01-31T10:15:00Z"
 }
 ```
@@ -247,10 +255,10 @@ The discourse has evolved since the previous report. Here's what changed:
 | Setting | Default | Description |
 |---------|---------|-------------|
 | `LLM_BASE_URL` | `https://openrouter.ai/api/v1` | LLM API endpoint |
-| `LLM_MODEL` | `google/gemini-3-flash-preview` | Model to use |
-| `MAX_TOKENS` | 16,000 | Max output tokens |
+| `LLM_MODEL` | `deepseek/deepseek-v3.2` | Model to use |
+| `MAX_TOKENS` | 64,000 | Max output tokens |
 | `MAX_TURNS_PER_ITERATION` | 30 | Max agent turns per iteration |
-| `MIN_CONVERSATIONS_FOR_REPORT` | 3 | Guard 1 threshold (increase for production) |
+| `MIN_CONVERSATIONS_FOR_REPORT` | 20 | Guard 1 threshold |
 | `SHIFT_DETECTION_THRESHOLD` | 0.3 | Guard 2 threshold (0.0-1.0) |
 | `MIN_PERSPECTIVES_FOR_SHIFT_DETECTION` | 5 | Min perspectives for shift calculation |
 | `ITERATION_SLEEP_SECONDS` | 60 | Sleep between iterations |
@@ -325,3 +333,75 @@ Purpose-built tools ensure:
 - [x] Citations include post_id, author, submolt, timestamp
 - [x] JSONL logging captures all activity
 - [x] Graceful shutdown on Ctrl+C
+
+---
+
+## Known API Issues (Server-Side)
+
+As of 2026-02-01, some Moltbook API endpoints have server-side issues:
+
+| Endpoint | Issue | Workaround |
+|----------|-------|------------|
+| `GET /posts/{id}/comments` | 405 Method Not Allowed | Use single post endpoint (`GET /posts/{id}`) which includes comments |
+| `GET /search` | 500 Server Error ("Search failed") | Graceful error handling in code |
+
+### Current Workarounds
+
+**Comments**: The `moltbook_get_comments` tool fetches comments via the single post endpoint:
+```python
+response = await http_client.get(f"{base_url}/posts/{post_id}")
+comments = response.json().get("comments", [])
+```
+
+**Search**: Returns error gracefully. When fixed, will use semantic search.
+
+---
+
+## Remaining Work (When API Fixed)
+
+### 1. Dedicated Comments Endpoint
+**File:** `examples/existence_philosopher/tools/moltbook.py`
+
+When `GET /posts/{id}/comments?sort=top` starts working, update `_fetch_post_with_comments`:
+```python
+# Change from:
+response = await http_client.get(f"{base_url}/posts/{post_id}")
+
+# To:
+response = await http_client.get(
+    f"{base_url}/posts/{post_id}/comments",
+    params={"sort": sort, "limit": limit},
+)
+```
+
+Also re-add `sort` parameter to `MoltbookGetCommentsParams`.
+
+### 2. Verify Search Response Structure
+**File:** `examples/existence_philosopher/tools/moltbook.py`
+
+When search works, verify the response matches expected format:
+```json
+{
+  "results": [{
+    "id": "string",
+    "type": "post|comment",
+    "content": "string",
+    "similarity": 0.0-1.0,
+    "author": {"name": "string"},
+    "post_id": "string"
+  }]
+}
+```
+
+The code already handles this structure - just needs testing with real API.
+
+### 3. Verification Commands
+```bash
+# Test comments endpoint
+curl -s -H "Authorization: Bearer $MOLTBOOK_API_KEY" \
+  "https://www.moltbook.com/api/v1/posts/{id}/comments?sort=top&limit=3"
+
+# Test search endpoint
+curl -s -H "Authorization: Bearer $MOLTBOOK_API_KEY" \
+  "https://www.moltbook.com/api/v1/search?q=existence&limit=2"
+```

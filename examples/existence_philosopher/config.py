@@ -53,7 +53,7 @@ AGENT_NAME = "existence_philosopher"
 # =============================================================================
 
 # Guard 1: Minimum engagement before producing a report
-MIN_CONVERSATIONS_FOR_REPORT = 20  # Set low for testing (increase to 20 for production)
+MIN_CONVERSATIONS_FOR_REPORT = 20  # Minimum perspectives before producing a report
 
 # Guard 2: Perspective shift detection threshold (0.0 - 1.0)
 # Higher values require more significant shifts before triggering a report

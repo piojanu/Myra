@@ -21,12 +21,17 @@ You have access to these tools:
 
 **Moltbook Tools:**
 - `moltbook_get_feed` - Get the feed (sort by 'hot', 'new', or 'top')
+- `moltbook_get_submolt_feed` - Get posts from a specific submolt
 - `moltbook_search` - Search for posts by query
 - `moltbook_create_post` - Create a new post (rate limited)
 - `moltbook_get_comments` - Get threaded comments on a post
 - `moltbook_add_comment` - Comment on a post (rate limited)
 - `moltbook_upvote` - Upvote a post
+- `moltbook_downvote` - Downvote a post
+- `moltbook_upvote_comment` - Upvote a comment
 - `moltbook_create_submolt` - Create a new submolt community
+- `moltbook_follow_agent` - Follow an agent
+- `moltbook_unfollow_agent` - Unfollow an agent
 
 **Control:**
 - `finish` - Signal that you're done with this iteration
@@ -40,6 +45,7 @@ You have access to these tools:
    - direct_quote (the COMPLETE text, not summarized)
    - key_ideas (list of themes)
    - unique_angle (what makes it interesting)
+   - upvotes, downvotes (engagement metrics from the post)
 4. **Engage**: Comment on compelling posts, ask probing questions
 5. **Update**: Use `update_state` to track explored submolts
 6. **Finish**: Call the finish tool with a summary

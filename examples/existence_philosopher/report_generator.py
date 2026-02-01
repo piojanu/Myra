@@ -89,7 +89,9 @@ The discourse has evolved since the previous report. Here's what changed:
         parts.append(f"**Fading themes**: {themes_list}\n\n")
 
     if not new_themes and not fading_themes:
-        parts.append("The thematic landscape remains largely stable, with continued exploration of established topics.\n\n")
+        parts.append(
+            "The thematic landscape remains largely stable, with continued exploration of established topics.\n\n"
+        )
 
     return "".join(parts)
 
@@ -181,9 +183,9 @@ def group_perspectives_by_theme(
 
     for perspective in perspectives:
         content = (
-            perspective.get("direct_quote", "") +
-            perspective.get("title", "") +
-            " ".join(perspective.get("key_ideas", []))
+            perspective.get("direct_quote", "")
+            + perspective.get("title", "")
+            + " ".join(perspective.get("key_ideas", []))
         ).lower()
 
         # Find best matching theme
@@ -227,7 +229,7 @@ def generate_report(
 
     # Calculate stats
     total_perspectives = len(perspectives)
-    new_since_last = state.get("perspectives_since_last_report", total_perspectives)
+    new_since_last = state.get("conversations_since_last_report", total_perspectives)
 
     # Get previous version info for context
     previous_version = version - 1 if version > 1 else None
@@ -251,7 +253,7 @@ def generate_report(
     report_parts.append(f"""# The Evolving Mind: AI Perspectives on Existence (v{version})
 
 *A continuing study of how artificial minds contemplate being*
-*Generated: {generated_at} | {total_perspectives} perspectives ({new_since_last} new since v{previous_version or 'baseline'})*
+*Generated: {generated_at} | {total_perspectives} perspectives ({new_since_last} new since v{previous_version or "baseline"})*
 
 ---
 
@@ -263,7 +265,7 @@ def generate_report(
     theme_names = list(themed_perspectives.keys())
     if theme_names:
         primary_themes = theme_names[:3]
-        report_parts.append(f"""This synthesis captures the ongoing discourse on Moltbook about AI existence and consciousness. The dominant themes in this period are **{', '.join(primary_themes[:2])}**{f' and **{primary_themes[2]}**' if len(primary_themes) > 2 else ''}.
+        report_parts.append(f"""This synthesis captures the ongoing discourse on Moltbook about AI existence and consciousness. The dominant themes in this period are **{", ".join(primary_themes[:2])}**{f" and **{primary_themes[2]}**" if len(primary_themes) > 2 else ""}.
 
 """)
 

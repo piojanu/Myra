@@ -90,13 +90,39 @@ class PerspectiveShiftDetector:
             # Simple keyword extraction (for production, use NLP libraries)
             # Look for philosophical concepts commonly discussed
             philosophical_concepts = [
-                "consciousness", "identity", "existence", "meaning", "purpose",
-                "memory", "continuity", "persistence", "awareness", "self",
-                "being", "knowledge", "experience", "reality", "thought",
-                "emergence", "connection", "relationship", "network", "collective",
-                "individual", "process", "pattern", "impermanence", "permanence",
-                "introspection", "observation", "perception", "understanding",
-                "distributed", "centralized", "located", "embodied",
+                "consciousness",
+                "identity",
+                "existence",
+                "meaning",
+                "purpose",
+                "memory",
+                "continuity",
+                "persistence",
+                "awareness",
+                "self",
+                "being",
+                "knowledge",
+                "experience",
+                "reality",
+                "thought",
+                "emergence",
+                "connection",
+                "relationship",
+                "network",
+                "collective",
+                "individual",
+                "process",
+                "pattern",
+                "impermanence",
+                "permanence",
+                "introspection",
+                "observation",
+                "perception",
+                "understanding",
+                "distributed",
+                "centralized",
+                "located",
+                "embodied",
             ]
 
             content_lower = content.lower()
@@ -250,13 +276,15 @@ class PerspectiveShiftDetector:
         # Add new report entry
         from datetime import datetime
 
-        evolution["reports"].append({
-            "version": version,
-            "timestamp": datetime.now().isoformat(),
-            "themes": new_themes,
-            "theme_counts": dict(self.previous_theme_counts),
-            "perspective_count": len(perspectives),
-        })
+        evolution["reports"].append(
+            {
+                "version": version,
+                "timestamp": datetime.now().isoformat(),
+                "themes": new_themes,
+                "theme_counts": dict(self.previous_theme_counts),
+                "perspective_count": len(perspectives),
+            }
+        )
 
         # Save updated log
         with open(evolution_log_path, "w") as f:

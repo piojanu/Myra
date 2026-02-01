@@ -127,11 +127,13 @@ class ExplorationLogger(AgentLogger):
         self._log_to_file("exploration", {"action": action, "details": details})
 
         # State tracking
-        self._exploration_state.append({
-            "timestamp": datetime.now().isoformat(),
-            "action": action,
-            "details": details,
-        })
+        self._exploration_state.append(
+            {
+                "timestamp": datetime.now().isoformat(),
+                "action": action,
+                "details": details,
+            }
+        )
         self._update_exploration_state()
 
     def log_perspective_found(self, author: str, preview: str, post_id: str | None = None) -> None:
@@ -162,11 +164,14 @@ class ExplorationLogger(AgentLogger):
             self._live.start()
 
         # File logging
-        self._log_to_file("perspective_found", {
-            "author": author,
-            "preview": preview,
-            "post_id": post_id,
-        })
+        self._log_to_file(
+            "perspective_found",
+            {
+                "author": author,
+                "preview": preview,
+                "post_id": post_id,
+            },
+        )
 
     def log_engagement(self, action: str, post_id: str, author: str) -> None:
         """Log when agent engages with a post.
@@ -194,11 +199,14 @@ class ExplorationLogger(AgentLogger):
             self._live.start()
 
         # File logging
-        self._log_to_file("engagement", {
-            "action": action,
-            "post_id": post_id,
-            "author": author,
-        })
+        self._log_to_file(
+            "engagement",
+            {
+                "action": action,
+                "post_id": post_id,
+                "author": author,
+            },
+        )
 
     def log_iteration_start(self, iteration: int) -> None:
         """Log the start of a new Ralph loop iteration.
@@ -248,10 +256,13 @@ class ExplorationLogger(AgentLogger):
             self._live.start()
 
         # File logging
-        self._log_to_file("iteration_end", {
-            "iteration": iteration,
-            "perspectives_collected": perspectives_collected,
-        })
+        self._log_to_file(
+            "iteration_end",
+            {
+                "iteration": iteration,
+                "perspectives_collected": perspectives_collected,
+            },
+        )
 
     def log_report_generated(self, version: int, output_path: Path) -> None:
         """Log when a new synthesis report is generated.
@@ -277,10 +288,13 @@ class ExplorationLogger(AgentLogger):
             self._live.start()
 
         # File logging
-        self._log_to_file("report_generated", {
-            "version": version,
-            "output_path": str(output_path),
-        })
+        self._log_to_file(
+            "report_generated",
+            {
+                "version": version,
+                "output_path": str(output_path),
+            },
+        )
 
     def log_guard_status(self, guard_name: str, passed: bool, message: str) -> None:
         """Log the status of a report guard check.
@@ -312,11 +326,14 @@ class ExplorationLogger(AgentLogger):
             self._live.start()
 
         # File logging
-        self._log_to_file("guard_status", {
-            "guard_name": guard_name,
-            "passed": passed,
-            "message": message,
-        })
+        self._log_to_file(
+            "guard_status",
+            {
+                "guard_name": guard_name,
+                "passed": passed,
+                "message": message,
+            },
+        )
 
     # =========================================================================
     # Override Context Manager to Support Custom Logging

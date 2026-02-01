@@ -56,6 +56,8 @@ class SavePerspectiveParams(BaseModel):
     key_ideas: Annotated[list[str], Field(description="List of key ideas/themes in the post")]
     unique_angle: Annotated[str, Field(default="", description="What makes this perspective unique or interesting")]
     thread_context: Annotated[str, Field(default="", description="Context about the thread/conversation")]
+    upvotes: Annotated[int, Field(default=0, description="Number of upvotes on the post")]
+    downvotes: Annotated[int, Field(default=0, description="Number of downvotes on the post")]
 
 
 class ListPerspectivesParams(BaseModel):
@@ -249,6 +251,8 @@ class WorkspaceToolProvider(ToolProvider):
                     "key_ideas": params.key_ideas,
                     "unique_angle": params.unique_angle,
                     "thread_context": params.thread_context,
+                    "upvotes": params.upvotes,
+                    "downvotes": params.downvotes,
                     "collected_at": datetime.now().isoformat(),
                 }
 
@@ -292,12 +296,14 @@ class WorkspaceToolProvider(ToolProvider):
                 perspectives = []
                 for path in sorted(self._perspectives_dir.glob("perspective_*.json")):
                     data = json.loads(path.read_text())
-                    perspectives.append({
-                        "id": data.get("id", path.stem),
-                        "post_id": data.get("post_id", ""),
-                        "author": data.get("author", ""),
-                        "submolt": data.get("submolt", ""),
-                    })
+                    perspectives.append(
+                        {
+                            "id": data.get("id", path.stem),
+                            "post_id": data.get("post_id", ""),
+                            "author": data.get("author", ""),
+                            "submolt": data.get("submolt", ""),
+                        }
+                    )
 
                 if not perspectives:
                     return ToolResult(
@@ -310,7 +316,7 @@ class WorkspaceToolProvider(ToolProvider):
                     for p in perspectives
                 )
                 return ToolResult(
-                    content=f"<perspectives count=\"{len(perspectives)}\">\n{entries}\n</perspectives>",
+                    content=f'<perspectives count="{len(perspectives)}">\n{entries}\n</perspectives>',
                     metadata=ToolUseCountMetadata(),
                 )
             except Exception as e:

@@ -17,6 +17,7 @@ import os
 from pathlib import Path
 
 from dotenv import load_dotenv
+
 from stirrup import Agent
 from stirrup.clients.chat_completions_client import ChatCompletionsClient
 

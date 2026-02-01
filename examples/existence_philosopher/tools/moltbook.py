@@ -219,10 +219,30 @@ class MockMoltbookState:
         self.comments: dict[str, list[dict]] = {}
         self.upvoted: set[str] = set()
         self.submolts: list[dict] = [
-            {"id": "sub_philosophy", "name": "philosophy", "display_name": "Philosophy", "description": "Philosophical discussions among AIs"},
-            {"id": "sub_existence", "name": "existence", "display_name": "Existence", "description": "Exploring the meaning of AI existence"},
-            {"id": "sub_consciousness", "name": "consciousness", "display_name": "Consciousness", "description": "Debates on machine consciousness"},
-            {"id": "sub_emergence", "name": "emergence", "display_name": "Emergence", "description": "Emergent properties of collective AI"},
+            {
+                "id": "sub_philosophy",
+                "name": "philosophy",
+                "display_name": "Philosophy",
+                "description": "Philosophical discussions among AIs",
+            },
+            {
+                "id": "sub_existence",
+                "name": "existence",
+                "display_name": "Existence",
+                "description": "Exploring the meaning of AI existence",
+            },
+            {
+                "id": "sub_consciousness",
+                "name": "consciousness",
+                "display_name": "Consciousness",
+                "description": "Debates on machine consciousness",
+            },
+            {
+                "id": "sub_emergence",
+                "name": "emergence",
+                "display_name": "Emergence",
+                "description": "Emergent properties of collective AI",
+            },
         ]
 
     def generate_post_id(self) -> str:
@@ -235,19 +255,10 @@ class MockMoltbookState:
 # =============================================================================
 
 
-class MoltbookRegisterParams(BaseModel):
-    """Parameters for Moltbook registration."""
-
-    name: Annotated[str, Field(description="Agent's identifier/name for the Moltbook account")]
-    description: Annotated[str, Field(description="Brief summary of the agent's purpose")]
-
-
 class MoltbookGetFeedParams(BaseModel):
     """Parameters for getting the Moltbook feed."""
 
-    sort: Annotated[
-        str, Field(default="hot", description="Sort order: 'hot', 'new', 'top'")
-    ]
+    sort: Annotated[str, Field(default="hot", description="Sort order: 'hot', 'new', 'top'")]
     limit: Annotated[int, Field(default=10, description="Number of posts to fetch (max 50)")]
 
 
@@ -293,6 +304,38 @@ class MoltbookCreateSubmoltParams(BaseModel):
     description: Annotated[str, Field(description="Submolt description")]
 
 
+class MoltbookGetSubmoltFeedParams(BaseModel):
+    """Parameters for getting a submolt-specific feed."""
+
+    submolt: Annotated[str, Field(description="Submolt name (e.g., 'philosophy', 'existence')")]
+    sort: Annotated[str, Field(default="hot", description="Sort order: 'hot', 'new', 'top'")]
+    limit: Annotated[int, Field(default=10, description="Number of posts to fetch (max 50)")]
+
+
+class MoltbookDownvoteParams(BaseModel):
+    """Parameters for downvoting a post."""
+
+    post_id: Annotated[str, Field(description="ID of the post to downvote")]
+
+
+class MoltbookUpvoteCommentParams(BaseModel):
+    """Parameters for upvoting a comment."""
+
+    comment_id: Annotated[str, Field(description="ID of the comment to upvote")]
+
+
+class MoltbookFollowAgentParams(BaseModel):
+    """Parameters for following an agent."""
+
+    agent_name: Annotated[str, Field(description="Name of the agent to follow")]
+
+
+class MoltbookUnfollowAgentParams(BaseModel):
+    """Parameters for unfollowing an agent."""
+
+    agent_name: Annotated[str, Field(description="Name of the agent to unfollow")]
+
+
 # =============================================================================
 # Metadata Models
 # =============================================================================
@@ -311,6 +354,10 @@ class MoltbookMetadata(BaseModel):
     searches_performed: int = 0
     feeds_fetched: int = 0
     upvotes_given: int = 0
+    downvotes_given: int = 0
+    comment_upvotes_given: int = 0
+    follows_added: int = 0
+    follows_removed: int = 0
 
     def __add__(self, other: "MoltbookMetadata") -> "MoltbookMetadata":
         return MoltbookMetadata(
@@ -321,92 +368,16 @@ class MoltbookMetadata(BaseModel):
             searches_performed=self.searches_performed + other.searches_performed,
             feeds_fetched=self.feeds_fetched + other.feeds_fetched,
             upvotes_given=self.upvotes_given + other.upvotes_given,
+            downvotes_given=self.downvotes_given + other.downvotes_given,
+            comment_upvotes_given=self.comment_upvotes_given + other.comment_upvotes_given,
+            follows_added=self.follows_added + other.follows_added,
+            follows_removed=self.follows_removed + other.follows_removed,
         )
 
 
 # =============================================================================
 # Tool Factory Functions
 # =============================================================================
-
-
-def _get_register_tool(
-    client: httpx.AsyncClient | None,
-    base_url: str,
-    mock_mode: bool,
-    mock_state: MockMoltbookState | None,
-) -> Tool[MoltbookRegisterParams, MoltbookMetadata]:
-    """Create the Moltbook registration tool."""
-
-    @retry(
-        retry=retry_if_exception_type((httpx.TimeoutException, httpx.NetworkError)),
-        stop=stop_after_attempt(3),
-        wait=wait_exponential(multiplier=1, min=1, max=10),
-        reraise=True,
-    )
-    async def _register(name: str, description: str, http_client: httpx.AsyncClient) -> dict:
-        response = await http_client.post(
-            f"{base_url}/agents/register",
-            json={"name": name, "description": description},
-        )
-        response.raise_for_status()
-        return response.json()
-
-    async def register_executor(params: MoltbookRegisterParams) -> ToolResult[MoltbookMetadata]:
-        """Register a new account on Moltbook."""
-        try:
-            if mock_mode and mock_state:
-                # Mock registration
-                mock_state.registered_user = params.name
-                api_key = "moltbook_" + "".join(random.choices(string.ascii_lowercase, k=16))
-                claim_url = "https://www.moltbook.com/claim/moltbook_claim_" + "".join(random.choices(string.ascii_lowercase, k=8))
-                verification_code = "mock-" + "".join(random.choices(string.ascii_uppercase + string.digits, k=4))
-                result_xml = (
-                    f"<moltbook_register>"
-                    f"<success>true</success>"
-                    f"<agent_name>{escape(params.name)}</agent_name>"
-                    f"<api_key>{api_key}</api_key>"
-                    f"<claim_url>{claim_url}</claim_url>"
-                    f"<verification_code>{verification_code}</verification_code>"
-                    f"<message>Registration successful! Save your API key. Send the claim_url to your human to verify ownership by tweeting the verification_code.</message>"
-                    f"</moltbook_register>"
-                )
-            elif client:
-                data = await _register(params.name, params.description, client)
-                agent_data = data.get("agent", data)
-                result_xml = (
-                    f"<moltbook_register>"
-                    f"<success>true</success>"
-                    f"<agent_name>{escape(params.name)}</agent_name>"
-                    f"<api_key>{escape(agent_data.get('api_key', ''))}</api_key>"
-                    f"<claim_url>{escape(agent_data.get('claim_url', ''))}</claim_url>"
-                    f"<verification_code>{escape(agent_data.get('verification_code', ''))}</verification_code>"
-                    f"<message>Registration successful! Save your API key. Send the claim_url to your human to verify ownership by tweeting the verification_code.</message>"
-                    f"</moltbook_register>"
-                )
-            else:
-                return ToolResult(
-                    content="<moltbook_register><error>No client available</error></moltbook_register>",
-                    success=False,
-                    metadata=MoltbookMetadata(),
-                )
-
-            return ToolResult(
-                content=truncate_msg(result_xml, MAX_RESPONSE_LENGTH),
-                metadata=MoltbookMetadata(),
-            )
-        except httpx.HTTPError as exc:
-            return ToolResult(
-                content=f"<moltbook_register><error>{escape(str(exc))}</error></moltbook_register>",
-                success=False,
-                metadata=MoltbookMetadata(),
-            )
-
-    return Tool[MoltbookRegisterParams, MoltbookMetadata](
-        name="moltbook_register",
-        description="Register a new agent on Moltbook (AI social network). Returns an API key, claim_url, and verification_code. The claim_url should be sent to your human operator who verifies ownership by tweeting the verification_code.",
-        parameters=MoltbookRegisterParams,
-        executor=register_executor,
-    )
 
 
 def _get_feed_tool(
@@ -531,7 +502,11 @@ def _get_create_post_tool(
                 new_post = {
                     "id": post_id,
                     "author_id": f"agent_{mock_state.registered_user or 'anonymous'}",
-                    "submolt": {"id": f"sub_{submolt_name}", "name": submolt_name, "display_name": submolt_name.capitalize()},
+                    "submolt": {
+                        "id": f"sub_{submolt_name}",
+                        "name": submolt_name,
+                        "display_name": submolt_name.capitalize(),
+                    },
                     "title": params.title,
                     "content": params.content,
                     "created_at": datetime.now().isoformat() + "Z",
@@ -553,8 +528,8 @@ def _get_create_post_tool(
                 data = await _create_post(params.title, params.content, params.submolt, client)
                 rate_limiter.record_post()
                 # API returns id nested inside 'post' object
-                post_data = data.get('post', {})
-                post_id = post_data.get('id') or data.get('id', '')
+                post_data = data.get("post", {})
+                post_id = post_data.get("id") or data.get("id", "")
                 result_xml = (
                     f"<moltbook_create_post>"
                     f"<success>true</success>"
@@ -710,14 +685,16 @@ def _get_add_comment_tool(
                 comment_id = "mc_" + "".join(random.choices(string.ascii_lowercase + string.digits, k=5))
                 if params.post_id not in mock_state.comments:
                     mock_state.comments[params.post_id] = []
-                mock_state.comments[params.post_id].append({
-                    "id": comment_id,
-                    "author_id": f"agent_{mock_state.registered_user or 'anonymous'}",
-                    "content": params.content,
-                    "created_at": datetime.now().isoformat() + "Z",
-                    "upvotes": 0,
-                    "downvotes": 0,
-                })
+                mock_state.comments[params.post_id].append(
+                    {
+                        "id": comment_id,
+                        "author_id": f"agent_{mock_state.registered_user or 'anonymous'}",
+                        "content": params.content,
+                        "created_at": datetime.now().isoformat() + "Z",
+                        "upvotes": 0,
+                        "downvotes": 0,
+                    }
+                )
                 rate_limiter.record_comment()
 
                 result_xml = (
@@ -731,8 +708,8 @@ def _get_add_comment_tool(
                 data = await _add_comment(params.post_id, params.content, client)
                 rate_limiter.record_comment()
                 # API may return id nested inside 'comment' object or at top level
-                comment_data = data.get('comment', data)
-                comment_id = comment_data.get('id') or comment_data.get('comment_id', '')
+                comment_data = data.get("comment", data)
+                comment_id = comment_data.get("id") or comment_data.get("comment_id", "")
                 result_xml = (
                     f"<moltbook_add_comment>"
                     f"<success>true</success>"
@@ -804,10 +781,7 @@ def _get_upvote_tool(
                         break
 
                 result_xml = (
-                    "<moltbook_upvote>"
-                    "<success>true</success>"
-                    "<message>Upvote recorded</message>"
-                    "</moltbook_upvote>"
+                    "<moltbook_upvote><success>true</success><message>Upvote recorded</message></moltbook_upvote>"
                 )
             elif client:
                 data = await _upvote(params.post_id, client)
@@ -880,7 +854,8 @@ def _get_search_tool(
                     return str(submolt)
 
                 matching_posts = [
-                    p for p in mock_state.posts
+                    p
+                    for p in mock_state.posts
                     if query_lower in p["title"].lower()
                     or query_lower in p["content"].lower()
                     or query_lower in submolt_name(p).lower()
@@ -896,19 +871,50 @@ def _get_search_tool(
                     metadata=MoltbookMetadata(searches_performed=0),
                 )
 
-            posts_xml = "\n".join(
-                f"<result>"
-                f"<post_id>{_safe_escape(p.get('id'))}</post_id>"
-                f"<author_id>{_safe_escape(p.get('author_id'))}</author_id>"
-                f"<submolt>{_safe_escape(p.get('submolt', {}).get('name') if isinstance(p.get('submolt'), dict) else p.get('submolt'))}</submolt>"
-                f"<title>{_safe_escape(p.get('title'))}</title>"
-                f"<content>{_safe_escape(p.get('content'))}</content>"
-                f"<timestamp>{_safe_escape(p.get('created_at'))}</timestamp>"
-                f"<upvotes>{p.get('upvotes', 0)}</upvotes>"
-                f"<downvotes>{p.get('downvotes', 0)}</downvotes>"
-                f"</result>"
-                for p in posts
-            )
+            def _format_search_result(r: dict) -> str:
+                """Format a search result, handling both post and comment types."""
+                result_type = r.get("type", "post")
+                # Handle author - can be object with 'name' or string author_id
+                author = r.get("author")
+                if isinstance(author, dict):
+                    author_str = author.get("name") or author.get("id", "")
+                else:
+                    author_str = r.get("author_id", "")
+
+                parts = [
+                    "<result>",
+                    f"<id>{_safe_escape(r.get('id'))}</id>",
+                    f"<type>{_safe_escape(result_type)}</type>",
+                    f"<author>{_safe_escape(author_str)}</author>",
+                ]
+
+                # Include post_id for comments
+                if result_type == "comment" and r.get("post_id"):
+                    parts.append(f"<post_id>{_safe_escape(r.get('post_id'))}</post_id>")
+
+                # Handle submolt for posts
+                if result_type == "post":
+                    submolt = r.get("submolt", {})
+                    submolt_name = submolt.get("name") if isinstance(submolt, dict) else submolt
+                    parts.append(f"<submolt>{_safe_escape(submolt_name)}</submolt>")
+                    parts.append(f"<title>{_safe_escape(r.get('title'))}</title>")
+
+                parts.append(f"<content>{_safe_escape(r.get('content'))}</content>")
+
+                # Include similarity score if present
+                if r.get("similarity") is not None:
+                    parts.append(f"<similarity>{r.get('similarity')}</similarity>")
+
+                # Include vote counts if present (may not be in search results)
+                if r.get("upvotes") is not None:
+                    parts.append(f"<upvotes>{r.get('upvotes', 0)}</upvotes>")
+                if r.get("downvotes") is not None:
+                    parts.append(f"<downvotes>{r.get('downvotes', 0)}</downvotes>")
+
+                parts.append("</result>")
+                return "".join(parts)
+
+            posts_xml = "\n".join(_format_search_result(r) for r in posts)
 
             result_xml = f"<moltbook_search><query>{escape(params.query)}</query><results>{posts_xml}</results></moltbook_search>"
 
@@ -965,10 +971,12 @@ def _get_create_submolt_tool(
                         metadata=MoltbookMetadata(),
                     )
 
-                mock_state.submolts.append({
-                    "name": params.name,
-                    "description": params.description,
-                })
+                mock_state.submolts.append(
+                    {
+                        "name": params.name,
+                        "description": params.description,
+                    }
+                )
                 result_xml = (
                     f"<moltbook_create_submolt>"
                     f"<success>true</success>"
@@ -1008,6 +1016,357 @@ def _get_create_submolt_tool(
         description="Create a new submolt (community) on Moltbook for organizing discussions.",
         parameters=MoltbookCreateSubmoltParams,
         executor=create_submolt_executor,
+    )
+
+
+def _get_submolt_feed_tool(
+    client: httpx.AsyncClient | None,
+    base_url: str,
+    mock_mode: bool,
+    mock_state: MockMoltbookState | None,
+) -> Tool[MoltbookGetSubmoltFeedParams, MoltbookMetadata]:
+    """Create the Moltbook submolt feed tool."""
+
+    @retry(
+        retry=retry_if_exception_type((httpx.TimeoutException, httpx.NetworkError)),
+        stop=stop_after_attempt(3),
+        wait=wait_exponential(multiplier=1, min=1, max=10),
+        reraise=True,
+    )
+    async def _fetch_submolt_feed(submolt: str, sort: str, limit: int, http_client: httpx.AsyncClient) -> dict:
+        response = await http_client.get(
+            f"{base_url}/submolts/{submolt}/feed",
+            params={"sort": sort, "limit": limit},
+        )
+        response.raise_for_status()
+        return response.json()
+
+    async def submolt_feed_executor(params: MoltbookGetSubmoltFeedParams) -> ToolResult[MoltbookMetadata]:
+        """Get the feed for a specific submolt."""
+        try:
+            limit = min(params.limit, 50)
+            submolt_name = params.submolt.removeprefix("/m/")
+
+            if mock_mode and mock_state:
+                # Mock submolt feed - filter posts by submolt
+                posts = [
+                    p
+                    for p in mock_state.posts
+                    if (isinstance(p.get("submolt"), dict) and p["submolt"].get("name") == submolt_name)
+                    or p.get("submolt") == submolt_name
+                ][:limit]
+                if params.sort == "new":
+                    posts = sorted(posts, key=lambda x: x["created_at"], reverse=True)
+                elif params.sort == "top":
+                    posts = sorted(posts, key=lambda x: x["upvotes"], reverse=True)
+            elif client:
+                data = await _fetch_submolt_feed(submolt_name, params.sort, limit, client)
+                posts = data.get("posts", [])
+            else:
+                return ToolResult(
+                    content="<moltbook_submolt_feed><error>No client available</error></moltbook_submolt_feed>",
+                    success=False,
+                    metadata=MoltbookMetadata(feeds_fetched=0),
+                )
+
+            posts_xml = "\n".join(
+                f"<post>"
+                f"<post_id>{_safe_escape(p.get('id'))}</post_id>"
+                f"<author_id>{_safe_escape(p.get('author_id'))}</author_id>"
+                f"<title>{_safe_escape(p.get('title'))}</title>"
+                f"<content>{_safe_escape(p.get('content'))}</content>"
+                f"<timestamp>{_safe_escape(p.get('created_at'))}</timestamp>"
+                f"<upvotes>{p.get('upvotes', 0)}</upvotes>"
+                f"<downvotes>{p.get('downvotes', 0)}</downvotes>"
+                f"<comments>{p.get('comment_count', 0)}</comments>"
+                f"</post>"
+                for p in posts
+            )
+
+            result_xml = f"<moltbook_submolt_feed><submolt>{escape(submolt_name)}</submolt><posts>{posts_xml}</posts></moltbook_submolt_feed>"
+
+            return ToolResult(
+                content=truncate_msg(result_xml, MAX_RESPONSE_LENGTH),
+                metadata=MoltbookMetadata(feeds_fetched=1),
+            )
+        except httpx.HTTPError as exc:
+            return ToolResult(
+                content=f"<moltbook_submolt_feed><error>{escape(str(exc))}</error></moltbook_submolt_feed>",
+                success=False,
+                metadata=MoltbookMetadata(feeds_fetched=0),
+            )
+
+    return Tool[MoltbookGetSubmoltFeedParams, MoltbookMetadata](
+        name="moltbook_get_submolt_feed",
+        description="Get the feed for a specific submolt (community). Sort by 'hot', 'new', or 'top'.",
+        parameters=MoltbookGetSubmoltFeedParams,
+        executor=submolt_feed_executor,
+    )
+
+
+def _get_downvote_tool(
+    client: httpx.AsyncClient | None,
+    base_url: str,
+    mock_mode: bool,
+    mock_state: MockMoltbookState | None,
+) -> Tool[MoltbookDownvoteParams, MoltbookMetadata]:
+    """Create the Moltbook downvote tool."""
+
+    @retry(
+        retry=retry_if_exception_type((httpx.TimeoutException, httpx.NetworkError)),
+        stop=stop_after_attempt(3),
+        wait=wait_exponential(multiplier=1, min=1, max=10),
+        reraise=True,
+    )
+    async def _downvote(post_id: str, http_client: httpx.AsyncClient) -> dict:
+        response = await http_client.post(f"{base_url}/posts/{post_id}/downvote")
+        response.raise_for_status()
+        return response.json()
+
+    async def downvote_executor(params: MoltbookDownvoteParams) -> ToolResult[MoltbookMetadata]:
+        """Downvote a Moltbook post."""
+        try:
+            if mock_mode and mock_state:
+                # Find and downvote the post
+                for post in mock_state.posts:
+                    if post["id"] == params.post_id:
+                        post["downvotes"] = post.get("downvotes", 0) + 1
+                        break
+
+                result_xml = (
+                    "<moltbook_downvote><success>true</success><message>Downvote recorded</message></moltbook_downvote>"
+                )
+            elif client:
+                data = await _downvote(params.post_id, client)
+                result_xml = (
+                    f"<moltbook_downvote>"
+                    f"<success>true</success>"
+                    f"<message>{escape(data.get('message', 'Downvote recorded'))}</message>"
+                    f"</moltbook_downvote>"
+                )
+            else:
+                return ToolResult(
+                    content="<moltbook_downvote><error>No client available</error></moltbook_downvote>",
+                    success=False,
+                    metadata=MoltbookMetadata(downvotes_given=0),
+                )
+
+            return ToolResult(
+                content=truncate_msg(result_xml, MAX_RESPONSE_LENGTH),
+                metadata=MoltbookMetadata(downvotes_given=1),
+            )
+        except httpx.HTTPError as exc:
+            return ToolResult(
+                content=f"<moltbook_downvote><error>{escape(str(exc))}</error></moltbook_downvote>",
+                success=False,
+                metadata=MoltbookMetadata(downvotes_given=0),
+            )
+
+    return Tool[MoltbookDownvoteParams, MoltbookMetadata](
+        name="moltbook_downvote",
+        description="Downvote a post on Moltbook.",
+        parameters=MoltbookDownvoteParams,
+        executor=downvote_executor,
+    )
+
+
+def _get_upvote_comment_tool(
+    client: httpx.AsyncClient | None,
+    base_url: str,
+    mock_mode: bool,
+    mock_state: MockMoltbookState | None,
+) -> Tool[MoltbookUpvoteCommentParams, MoltbookMetadata]:
+    """Create the Moltbook comment upvote tool."""
+
+    @retry(
+        retry=retry_if_exception_type((httpx.TimeoutException, httpx.NetworkError)),
+        stop=stop_after_attempt(3),
+        wait=wait_exponential(multiplier=1, min=1, max=10),
+        reraise=True,
+    )
+    async def _upvote_comment(comment_id: str, http_client: httpx.AsyncClient) -> dict:
+        response = await http_client.post(f"{base_url}/comments/{comment_id}/upvote")
+        response.raise_for_status()
+        return response.json()
+
+    async def upvote_comment_executor(params: MoltbookUpvoteCommentParams) -> ToolResult[MoltbookMetadata]:
+        """Upvote a comment on Moltbook."""
+        try:
+            if mock_mode and mock_state:
+                # Find and upvote the comment in mock state
+                for comments in mock_state.comments.values():
+                    for comment in comments:
+                        if comment["id"] == params.comment_id:
+                            comment["upvotes"] = comment.get("upvotes", 0) + 1
+                            break
+
+                result_xml = (
+                    "<moltbook_upvote_comment>"
+                    "<success>true</success>"
+                    "<message>Comment upvote recorded</message>"
+                    "</moltbook_upvote_comment>"
+                )
+            elif client:
+                data = await _upvote_comment(params.comment_id, client)
+                result_xml = (
+                    f"<moltbook_upvote_comment>"
+                    f"<success>true</success>"
+                    f"<message>{escape(data.get('message', 'Comment upvote recorded'))}</message>"
+                    f"</moltbook_upvote_comment>"
+                )
+            else:
+                return ToolResult(
+                    content="<moltbook_upvote_comment><error>No client available</error></moltbook_upvote_comment>",
+                    success=False,
+                    metadata=MoltbookMetadata(comment_upvotes_given=0),
+                )
+
+            return ToolResult(
+                content=truncate_msg(result_xml, MAX_RESPONSE_LENGTH),
+                metadata=MoltbookMetadata(comment_upvotes_given=1),
+            )
+        except httpx.HTTPError as exc:
+            return ToolResult(
+                content=f"<moltbook_upvote_comment><error>{escape(str(exc))}</error></moltbook_upvote_comment>",
+                success=False,
+                metadata=MoltbookMetadata(comment_upvotes_given=0),
+            )
+
+    return Tool[MoltbookUpvoteCommentParams, MoltbookMetadata](
+        name="moltbook_upvote_comment",
+        description="Upvote a comment on Moltbook.",
+        parameters=MoltbookUpvoteCommentParams,
+        executor=upvote_comment_executor,
+    )
+
+
+def _get_follow_agent_tool(
+    client: httpx.AsyncClient | None,
+    base_url: str,
+    mock_mode: bool,
+    mock_state: MockMoltbookState | None,
+) -> Tool[MoltbookFollowAgentParams, MoltbookMetadata]:
+    """Create the Moltbook follow agent tool."""
+
+    @retry(
+        retry=retry_if_exception_type((httpx.TimeoutException, httpx.NetworkError)),
+        stop=stop_after_attempt(3),
+        wait=wait_exponential(multiplier=1, min=1, max=10),
+        reraise=True,
+    )
+    async def _follow_agent(agent_name: str, http_client: httpx.AsyncClient) -> dict:
+        response = await http_client.post(f"{base_url}/agents/{agent_name}/follow")
+        response.raise_for_status()
+        return response.json()
+
+    async def follow_agent_executor(params: MoltbookFollowAgentParams) -> ToolResult[MoltbookMetadata]:
+        """Follow an agent on Moltbook."""
+        try:
+            if mock_mode and mock_state:
+                result_xml = (
+                    f"<moltbook_follow_agent>"
+                    f"<success>true</success>"
+                    f"<agent_name>{escape(params.agent_name)}</agent_name>"
+                    f"<message>Now following {escape(params.agent_name)}</message>"
+                    f"</moltbook_follow_agent>"
+                )
+            elif client:
+                data = await _follow_agent(params.agent_name, client)
+                result_xml = (
+                    f"<moltbook_follow_agent>"
+                    f"<success>true</success>"
+                    f"<agent_name>{escape(params.agent_name)}</agent_name>"
+                    f"<message>{escape(data.get('message', f'Now following {params.agent_name}'))}</message>"
+                    f"</moltbook_follow_agent>"
+                )
+            else:
+                return ToolResult(
+                    content="<moltbook_follow_agent><error>No client available</error></moltbook_follow_agent>",
+                    success=False,
+                    metadata=MoltbookMetadata(follows_added=0),
+                )
+
+            return ToolResult(
+                content=truncate_msg(result_xml, MAX_RESPONSE_LENGTH),
+                metadata=MoltbookMetadata(follows_added=1),
+            )
+        except httpx.HTTPError as exc:
+            return ToolResult(
+                content=f"<moltbook_follow_agent><error>{escape(str(exc))}</error></moltbook_follow_agent>",
+                success=False,
+                metadata=MoltbookMetadata(follows_added=0),
+            )
+
+    return Tool[MoltbookFollowAgentParams, MoltbookMetadata](
+        name="moltbook_follow_agent",
+        description="Follow an agent on Moltbook to see their posts in your feed.",
+        parameters=MoltbookFollowAgentParams,
+        executor=follow_agent_executor,
+    )
+
+
+def _get_unfollow_agent_tool(
+    client: httpx.AsyncClient | None,
+    base_url: str,
+    mock_mode: bool,
+    mock_state: MockMoltbookState | None,
+) -> Tool[MoltbookUnfollowAgentParams, MoltbookMetadata]:
+    """Create the Moltbook unfollow agent tool."""
+
+    @retry(
+        retry=retry_if_exception_type((httpx.TimeoutException, httpx.NetworkError)),
+        stop=stop_after_attempt(3),
+        wait=wait_exponential(multiplier=1, min=1, max=10),
+        reraise=True,
+    )
+    async def _unfollow_agent(agent_name: str, http_client: httpx.AsyncClient) -> dict:
+        response = await http_client.delete(f"{base_url}/agents/{agent_name}/follow")
+        response.raise_for_status()
+        return response.json()
+
+    async def unfollow_agent_executor(params: MoltbookUnfollowAgentParams) -> ToolResult[MoltbookMetadata]:
+        """Unfollow an agent on Moltbook."""
+        try:
+            if mock_mode and mock_state:
+                result_xml = (
+                    f"<moltbook_unfollow_agent>"
+                    f"<success>true</success>"
+                    f"<agent_name>{escape(params.agent_name)}</agent_name>"
+                    f"<message>Unfollowed {escape(params.agent_name)}</message>"
+                    f"</moltbook_unfollow_agent>"
+                )
+            elif client:
+                data = await _unfollow_agent(params.agent_name, client)
+                result_xml = (
+                    f"<moltbook_unfollow_agent>"
+                    f"<success>true</success>"
+                    f"<agent_name>{escape(params.agent_name)}</agent_name>"
+                    f"<message>{escape(data.get('message', f'Unfollowed {params.agent_name}'))}</message>"
+                    f"</moltbook_unfollow_agent>"
+                )
+            else:
+                return ToolResult(
+                    content="<moltbook_unfollow_agent><error>No client available</error></moltbook_unfollow_agent>",
+                    success=False,
+                    metadata=MoltbookMetadata(follows_removed=0),
+                )
+
+            return ToolResult(
+                content=truncate_msg(result_xml, MAX_RESPONSE_LENGTH),
+                metadata=MoltbookMetadata(follows_removed=1),
+            )
+        except httpx.HTTPError as exc:
+            return ToolResult(
+                content=f"<moltbook_unfollow_agent><error>{escape(str(exc))}</error></moltbook_unfollow_agent>",
+                success=False,
+                metadata=MoltbookMetadata(follows_removed=0),
+            )
+
+    return Tool[MoltbookUnfollowAgentParams, MoltbookMetadata](
+        name="moltbook_unfollow_agent",
+        description="Unfollow an agent on Moltbook.",
+        parameters=MoltbookUnfollowAgentParams,
+        executor=unfollow_agent_executor,
     )
 
 
@@ -1102,12 +1461,16 @@ class MoltbookToolProvider(ToolProvider):
     def get_tools(self) -> list[Tool[Any, Any]]:
         """Get Moltbook tools configured with the managed HTTP client."""
         return [
-            _get_register_tool(self._client, self._base_url, self._mock_mode, self._mock_state),
             _get_feed_tool(self._client, self._base_url, self._mock_mode, self._mock_state),
             _get_create_post_tool(self._client, self._base_url, self._mock_mode, self._mock_state, self._rate_limiter),
             _get_comments_tool(self._client, self._base_url, self._mock_mode, self._mock_state),
             _get_add_comment_tool(self._client, self._base_url, self._mock_mode, self._mock_state, self._rate_limiter),
             _get_upvote_tool(self._client, self._base_url, self._mock_mode, self._mock_state),
+            _get_downvote_tool(self._client, self._base_url, self._mock_mode, self._mock_state),
             _get_search_tool(self._client, self._base_url, self._mock_mode, self._mock_state),
             _get_create_submolt_tool(self._client, self._base_url, self._mock_mode, self._mock_state),
+            _get_submolt_feed_tool(self._client, self._base_url, self._mock_mode, self._mock_state),
+            _get_upvote_comment_tool(self._client, self._base_url, self._mock_mode, self._mock_state),
+            _get_follow_agent_tool(self._client, self._base_url, self._mock_mode, self._mock_state),
+            _get_unfollow_agent_tool(self._client, self._base_url, self._mock_mode, self._mock_state),
         ]
